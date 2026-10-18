@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Lista del súper — Etiqueta Segura</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5; max-width: 640px; margin: 0 auto; padding: 20px 16px 64px; color: #1b1b1b; background: #fff; }
+    h1 { font-size: 1.5rem; color: #2E7D32; margin-bottom: 4px; }
+    .sub { color: #555; margin-top: 0; }
+    a { color: #2E7D32; }
+    .btn { display: inline-block; background: #2E7D32; color: #fff !important; padding: 12px 18px; border-radius: 24px; text-decoration: none; font-weight: 600; margin: 8px 8px 8px 0; }
+    .btn.sec { background: transparent; color: #2E7D32 !important; border: 2px solid #2E7D32; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e5e5e5; }
+    li img, li .ph { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #e8f0e8; flex: none; }
+    .name { font-weight: 600; }
+    .meta { color: #555; font-size: 0.9rem; }
+    .note { font-size: 0.85rem; color: #555; margin-top: 24px; }
+    #msg { padding: 16px; background: #f4f4f4; border-radius: 12px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #121212; color: #e6e6e6; }
+      a, h1 { color: #81c784; }
+      .btn { background: #388e3c; }
+      .btn.sec { background: transparent; color: #81c784 !important; border-color: #81c784; }
+      li { border-color: #333; }
+      .sub, .meta, .note { color: #aaa; }
+      #msg { background: #1e1e1e; }
+      li img, li .ph { background: #263326; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🛒 Lista del súper</h1>
+  <p class="sub" id="sub">Te la compartieron desde Etiqueta Segura.</p>
+  <div id="msg">Cargando la lista…</div>
+  <ul id="items"></ul>
+  <div id="actions" hidden>
+    <a class="btn" id="open" href="#">Abrir en Etiqueta Segura</a>
+    <a class="btn sec" href="https://play.google.com/store/apps/details?id=com.rodsimonc.etiqueta_segura">Descargar la app</a>
+  </div>
+  <p class="note">Esta lista se borra sola a las 24 horas de generarla; después el enlace deja de funcionar. Solo contiene nombres de productos, cantidades y fotos públicas: ningún dato personal. <a href="./">Política de privacidad</a></p>
+
+<script>
+(function () {
+  var URL_API = 'https://ssehxfpouathaerxldko.supabase.co/rest/v1/rpc/get_shared_list';
+  var KEY = 'sb_publishable_A8oc2fNSF2XJ0KzPLs-XZA_dORuxT0_';
+  var code = (location.hash || '').replace('#', '').toLowerCase();
+  var msg = document.getElementById('msg');
+  var list = document.getElementById('items');
+  var actions = document.getElementById('actions');
+
+  function text(el, t) { el.textContent = t; return el; }
+
+  if (!/^[0-9a-f]{16}$/.test(code)) {
+    text(msg, 'Este enlace no es válido. Pedile a quien te lo mandó que genere otra lista.');
+    return;
+  }
+
+  var deep = 'etiquetasegura://lista/' + code;
+  var open = document.getElementById('open');
+  var isAndroid = /android/i.test(navigator.userAgent);
+  open.href = isAndroid
+    ? 'intent://lista/' + code + '#Intent;scheme=etiquetasegura;package=com.rodsimonc.etiqueta_segura;end'
+    : deep;
+  actions.hidden = false;
+
+  fetch(URL_API, {
+    method: 'POST',
+    headers: { 'apikey': KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_code: code })
+  }).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (data) {
+      if (!data || !data.payload || !Array.isArray(data.payload.items)) {
+        text(msg, 'Esta lista ya venció o no existe. Las listas se borran a las 24 horas: pedile a quien te la mandó que genere otra.');
+        open.hidden = true;
+        return;
+      }
+      var items = data.payload.items.slice(0, 100);
+      msg.hidden = true;
+      var left = Math.max(0, Math.round((new Date(data.expires_at) - new Date()) / 3600000));
+      text(document.getElementById('sub'), items.length + ' productos · vence en ' + (left < 1 ? 'menos de una hora' : left + ' h'));
+      items.forEach(function (it) {
+        var li = document.createElement('li');
+        var img = String(it.img || '');
+        if (img.indexOf('https://') === 0) {
+          var im = document.createElement('img');
+          im.src = img; im.alt = ''; im.referrerPolicy = 'no-referrer'; im.loading = 'lazy';
+          im.onerror = function () { var ph = document.createElement('div'); ph.className = 'ph'; im.replaceWith(ph); };
+          li.appendChild(im);
+        } else {
+          var ph = document.createElement('div'); ph.className = 'ph'; li.appendChild(ph);
+        }
+        var box = document.createElement('div');
+        var q = Number(it.q) || 1;
+        var pack = String(it.p || 'unidad');
+        if (q !== 1 && !/s$/.test(pack) && ['kg', 'g', 'l', 'ml'].indexOf(pack) < 0) {
+          pack += /[aeiou]$/.test(pack) ? 's' : 'es';
+        }
+        var meta = q + ' ' + pack + (it.b ? ' · ' + String(it.b) : '') + (it.nd ? ' · Receta pide ' + String(it.nd) : '');
+        var nm = text(document.createElement('div'), String(it.n || ''));
+        nm.className = 'name';
+        box.appendChild(nm);
+        var m = text(document.createElement('div'), meta); m.className = 'meta';
+        box.appendChild(m);
+        li.appendChild(box);
+        list.appendChild(li);
+      });
+    })
+    .catch(function () {
+      text(msg, 'No se pudo cargar la lista. Revisá tu conexión e intentá de nuevo.');
+    });
+})();
+</script>
+</body>
+</html>
